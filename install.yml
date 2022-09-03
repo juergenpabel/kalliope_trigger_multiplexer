@@ -1,0 +1,6 @@
+---
+- name: multiplexer
+  hosts: localhost
+  gather_facts: no
+  connection: local
+
