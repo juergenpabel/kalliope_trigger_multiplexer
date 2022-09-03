@@ -4,6 +4,7 @@ import time
 import logging
 from threading import Thread
 from kalliope import Utils
+from kalliope.core.ConfigurationManager import SettingLoader
 from paho.mqtt import client as mqtt_client
 
 
@@ -24,18 +25,26 @@ class Multiplexer(Thread):
 		self.callback = kwargs.get('callback', None)
 		if self.callback is None:
 			raise MissingParameterException("keyword parameter 'callback' is required")
+		sl = SettingLoader()
 		self.triggers = {}
-#TODO:parse config section, load trigger module and mash config into kwargs
-#TODO		for name in triggers:
-#TODO			self.triggers[name] = Trigger(name='trigger_{}'.format(name), **kwargs)
+		for trigger_name in kwargs.get('triggers', '').split(','):
+			trigger_name = trigger_name.strip()
+			for trigger_setting in sl.settings.triggers:
+				if trigger_name == trigger_setting.name:
+					logger.debug("[trigger:multiplexer] adding trigger '{}'".format(trigger_name))
+					trigger_setting.parameters['callback'] = self.callback
+					self.triggers[trigger_name] = Utils.get_dynamic_class_instantiation(package_name="trigger",
+					                                                                    module_name=trigger_name,
+					                                                                    parameters=trigger_setting.parameters,
+					                                                                    resources_dir=sl.settings.resources.trigger_folder)
 
 
 	def run(self):
 		logger.debug("[trigger:multiplexer] run()")
 		self.paused = False
-		for name, trigger in self.triggers:
+		for name in self.triggers.keys():
 			logger.debug("[trigger:multiplexer] about to call {}.run() in new thread".format(name))
-			trigger.start()
+			self.triggers[name].start()
 		logger.debug("[trigger:multiplexer] run()...")
 		mqtt = mqtt_client.Client('kalliope_trigger_multiplexer')
 		mqtt.connect(self.config['mqtt-address'], self.config['mqtt-port'])
@@ -59,15 +68,15 @@ class Multiplexer(Thread):
 	def pause(self):
 		logger.info("[trigger:multiplexer] pause()")
 		self.paused = True
-		for name, trigger in self.triggers:
+		for name in self.triggers.keys():
 			logger.debug("[trigger:multiplexer] about to call {}.pause()".format(name))
-			trigger.pause()
+			self.triggers[name].pause()
 
 
 	def unpause(self):
 		logger.info("[trigger:multiplexer] unpause()")
 		self.paused = False
-		for name, trigger in self.triggers:
+		for name in self.triggers.keys():
 			logger.debug("[trigger:multiplexer] about to call {}.unpause()".format(name))
-			trigger.unpause()
+			self.triggers[name].unpause()
 
