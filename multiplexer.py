@@ -58,7 +58,8 @@ class Multiplexer(Thread):
 	def on_mqtt(self, client, userdata, message):
 		logger.debug("[trigger:multiplexer] on_mqtt()")
 		if message.topic == self.config['mqtt-topic-trigger']:
-			self.callback()
+			if self.paused is False:
+				self.callback()
 		if message.topic == self.config['mqtt-topic-pause']:
 			self.pause()
 		if message.topic == self.config['mqtt-topic-unpause']:
