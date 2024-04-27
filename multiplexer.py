@@ -22,8 +22,8 @@ class Multiplexer(Thread):
 		self.config['mqtt-topic-trigger'] = kwargs.get('topic_trigger', 'kalliope/trigger/multiplexer/trigger')
 		self.config['mqtt-topic-pause']   = kwargs.get('topic_pause',   'kalliope/trigger/multiplexer/pause')
 		self.config['mqtt-topic-unpause'] = kwargs.get('topic_unpause', 'kalliope/trigger/multiplexer/unpause')
-		self.callback = kwargs.get('callback', None)
-		if self.callback is None:
+		self.kalliope_callback = kwargs.get('callback', None)
+		if self.kalliope_callback is None:
 			raise MissingParameterException("keyword parameter 'callback' is required")
 		sl = SettingLoader()
 		self.triggers = {}
@@ -31,7 +31,7 @@ class Multiplexer(Thread):
 			trigger_name = trigger_name.strip()
 			for trigger_setting in sl.settings.triggers:
 				if trigger_name == trigger_setting.name:
-					logger.debug("[trigger:multiplexer] adding trigger '{}'".format(trigger_name))
+					logger.debug(f"[trigger:multiplexer] adding trigger '{trigger_name}'")
 					trigger_setting.parameters['callback'] = self.callback
 					self.triggers[trigger_name] = Utils.get_dynamic_class_instantiation(package_name="trigger",
 					                                                                    module_name=trigger_name,
@@ -43,9 +43,8 @@ class Multiplexer(Thread):
 		logger.debug("[trigger:multiplexer] run()")
 		self.paused = False
 		for name in self.triggers.keys():
-			logger.debug("[trigger:multiplexer] about to call {}.run() in new thread".format(name))
+			logger.debug(f"[trigger:multiplexer] about to call {name}.run() in new thread")
 			self.triggers[name].start()
-		logger.debug("[trigger:multiplexer] run()...")
 		mqtt = mqtt_client.Client('kalliope_trigger_multiplexer')
 		mqtt.connect(self.config['mqtt-address'], self.config['mqtt-port'])
 		mqtt.subscribe(self.config['mqtt-topic-trigger'])
@@ -59,7 +58,7 @@ class Multiplexer(Thread):
 		logger.debug("[trigger:multiplexer] on_mqtt()")
 		if message.topic == self.config['mqtt-topic-trigger']:
 			if self.paused is False:
-				self.callback()
+				self.kalliope_callback()
 		if message.topic == self.config['mqtt-topic-pause']:
 			self.pause()
 		if message.topic == self.config['mqtt-topic-unpause']:
@@ -70,7 +69,7 @@ class Multiplexer(Thread):
 		logger.info("[trigger:multiplexer] pause()")
 		self.paused = True
 		for name in self.triggers.keys():
-			logger.debug("[trigger:multiplexer] about to call {}.pause()".format(name))
+			logger.debug(f"[trigger:multiplexer] about to call {name}.pause()")
 			self.triggers[name].pause()
 
 
@@ -78,6 +77,15 @@ class Multiplexer(Thread):
 		logger.info("[trigger:multiplexer] unpause()")
 		self.paused = False
 		for name in self.triggers.keys():
-			logger.debug("[trigger:multiplexer] about to call {}.unpause()".format(name))
+			logger.debug(f"[trigger:multiplexer] about to call {name}.unpause()")
 			self.triggers[name].unpause()
+
+	def callback(self):
+		logger.info("[trigger:multiplexer] callback() [due to a callback invocation from a multiplexed trigger]")
+		if self.paused is False:
+			self.paused = True
+			for name in self.triggers.keys():
+				logger.debug(f"[trigger:multiplexer] about to call {name}.pause()")
+				self.triggers[name].pause()
+			self.kalliope_callback()
 
