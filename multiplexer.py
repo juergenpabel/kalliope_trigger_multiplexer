@@ -19,9 +19,7 @@ class Multiplexer(Thread):
 		self.config = {}
 		self.config['mqtt-address'] = kwargs.get('mqtt_address', 'localhost')
 		self.config['mqtt-port']    = kwargs.get('mqtt_port', 1883)
-		self.config['mqtt-topic-trigger'] = kwargs.get('topic_trigger', 'kalliope/trigger/multiplexer/trigger')
-		self.config['mqtt-topic-pause']   = kwargs.get('topic_pause',   'kalliope/trigger/multiplexer/pause')
-		self.config['mqtt-topic-unpause'] = kwargs.get('topic_unpause', 'kalliope/trigger/multiplexer/unpause')
+		self.config['mqtt-topic'] = kwargs.get('mqtt_topic', 'kalliope/trigger/multiplexer/event')
 		self.kalliope_callback = kwargs.get('callback', None)
 		if self.kalliope_callback is None:
 			raise MissingParameterException("keyword parameter 'callback' is required")
@@ -47,22 +45,21 @@ class Multiplexer(Thread):
 			self.triggers[name].start()
 		mqtt = mqtt_client.Client('kalliope_trigger_multiplexer')
 		mqtt.connect(self.config['mqtt-address'], self.config['mqtt-port'])
-		mqtt.subscribe(self.config['mqtt-topic-trigger'])
-		mqtt.subscribe(self.config['mqtt-topic-pause'])
-		mqtt.subscribe(self.config['mqtt-topic-unpause'])
+		mqtt.subscribe(self.config['mqtt-topic'])
 		mqtt.on_message = self.on_mqtt
 		mqtt.loop_forever()
 
 
 	def on_mqtt(self, client, userdata, message):
 		logger.debug("[trigger:multiplexer] on_mqtt()")
-		if message.topic == self.config['mqtt-topic-trigger']:
+		payload = message.payload.decode('utf-8')
+		if payload == "pause":
+			self.pause()
+		if payload == "unpause":
+			self.unpause()
+		if payload is None or payload == "" or payload == "trigger":
 			if self.paused is False:
 				self.kalliope_callback()
-		if message.topic == self.config['mqtt-topic-pause']:
-			self.pause()
-		if message.topic == self.config['mqtt-topic-unpause']:
-			self.unpause()
 
 
 	def pause(self):
