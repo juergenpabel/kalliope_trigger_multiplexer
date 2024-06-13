@@ -17,8 +17,9 @@ class Multiplexer(Thread):
 		super(Multiplexer, self).__init__(name='trigger_multiplexer', daemon=True)
 		logger.debug("[trigger:multiplexer] __init__()")
 		self.config = {}
-		self.config['mqtt-address'] = kwargs.get('mqtt_address', 'localhost')
-		self.config['mqtt-port']    = kwargs.get('mqtt_port', 1883)
+		self.config['mqtt-broker-ip'] = kwargs.get('broker_ip', '127.0.0.1')
+		self.config['mqtt-broker-port'] = kwargs.get('broker_port', 1883)
+		self.config['mqtt-client_id'] = kwargs.get('client_id', 'kalliope:trigger:multiplexer')
 		self.config['mqtt-topic'] = kwargs.get('mqtt_topic', 'kalliope/trigger/multiplexer/event')
 		self.kalliope_callback = kwargs.get('callback', None)
 		if self.kalliope_callback is None:
@@ -43,8 +44,8 @@ class Multiplexer(Thread):
 		for name in self.triggers.keys():
 			logger.debug(f"[trigger:multiplexer] about to call {name}.run() in new thread")
 			self.triggers[name].start()
-		mqtt = mqtt_client.Client('kalliope_trigger_multiplexer')
-		mqtt.connect(self.config['mqtt-address'], self.config['mqtt-port'])
+		mqtt = mqtt_client.Client(self.config['mqtt-client_id'])
+		mqtt.connect(self.config['mqtt-broker-ip'], self.config['mqtt-broker-port'])
 		mqtt.subscribe(self.config['mqtt-topic'])
 		mqtt.on_message = self.on_mqtt
 		mqtt.loop_forever()
